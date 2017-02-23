@@ -1,6 +1,7 @@
 import os
 import sys
 import datetime
+import time
 #import cx_Oracle
 
 class ETL:
@@ -51,7 +52,48 @@ class ETL:
         #String eventId = String.format("%1$tY%1$tm%1$td%1$tH%1$tM%1$tS%2$s%3$03d", new Object[] { c, prg, Integer.valueOf(event_count) });
         eventId = time.strftime('%Y%m%d%H%M%S',time.localtime(time.time()))+prg+"%03d"%(event_count)
         strCurrentTime = time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))
-        sqlText = ""
+        rows = [(eventId,severity,desc,strCurrentTime)]
+        sqlText = "insert into ETL_Event (EventID, EventStatus, Severity, Description, LogTime, CloseTime) values (:1,'0',:2,:3,:4,null)"
+        try:
+            cursor = con.cursor()
+            cursor.executemany(sqlText,rows)
+            con.commit
+        except DatabaseError as error:
+            print "Oracle-Error-Code:", error.code
+            print "Oracle-Error-Message:", error.message
+            cursor.close()
+            con.close()
+            return False
+        finally:
+            cursor.close()
+            con.close()
+        return True
+    
+    def Sleep(self,second):
+        pass
+
+    def FromTxDate(self,txdate):
+        year = int(txDate[0:4])
+        month = int(txDate[4:6])
+        date = int(txDate[6:8])
+        return datetime.datetime(year,month-1,date)
+
+    def GetToday(self):
+        return time.strftime('%Y%m%d',time.localtime(time.time()))
+
+    def GetDateTime(self):
+        return time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))
+
+        
+
+
+            
+
+        
+
+
+
+
 
         
 

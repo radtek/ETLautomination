@@ -1,18 +1,23 @@
 import os
 import sys
+import re
 import datetime
 import time
-#import cx_Oracle
+import ConfigParser
+import logging
+import cx_Oracle as oracle
+logging.basicConfig(level=logging.INFO)
 
 class ETL:
     Version = "2.7.1_01"
     Auto_home = "/ETL"
     Auto_server = "ETL1"
-    Auto_url = "jdbc:teradata://153.65.143.251/CLIENT_CHARSET=cp936"
+    Auto_url = "fsicbc02/FSICBC02@172.17.0.120/orcl"
     Auto_dsn = ""
     UserName = "etl"
     UserPass = "etl"
     Auto_db = "etl"
+    Auto_ip = "xxx.xxx.xxx.xxx"
     today = ""
     event_count = 0
     jobEvent = {}
@@ -48,9 +53,9 @@ class ETL:
         return False
 
     def InsertEventLog(self,con,prg,severity,desc):
-        event_count = 0 if event_count>999 else event_count+1
+        self.event_count = 0 if self.event_count>999 else self.event_count+1
         #String eventId = String.format("%1$tY%1$tm%1$td%1$tH%1$tM%1$tS%2$s%3$03d", new Object[] { c, prg, Integer.valueOf(event_count) });
-        eventId = time.strftime('%Y%m%d%H%M%S',time.localtime(time.time()))+prg+"%03d"%(event_count)
+        eventId = time.strftime('%Y%m%d%H%M%S',time.localtime(time.time()))+prg+"%03d"%(self.event_count)
         strCurrentTime = time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))
         rows = [(eventId,severity,desc,strCurrentTime)]
         sqlText = "insert into ETL_Event (EventID, EventStatus, Severity, Description, LogTime, CloseTime) values (:1,'0',:2,:3,:4,null)"
@@ -58,9 +63,9 @@ class ETL:
             cursor = con.cursor()
             cursor.executemany(sqlText,rows)
             con.commit
-        except DatabaseError as error:
-            print "Oracle-Error-Code:", error.code
-            print "Oracle-Error-Message:", error.message
+        except oracle.DatabaseError as error:
+            logging.error("Oracle-Error-Code: "+error.code)
+            logging.error("Oracle-Error-Message: "+error.message) 
             cursor.close()
             con.close()
             return False
@@ -84,6 +89,146 @@ class ETL:
     def GetDateTime(self):
         return time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))
 
+    def putVarsToCommand(self,props,cmds):
+        pos1 = 0
+        pos=cmds.index('$',pos1)
+        while(pos >= 0):
+            pos2 = pos
+            encloser = False
+            pos += 1
+            if(cmds[pos] == '$'):
+                encloser = True
+                pos += 1
+            varNameLen = 0
+            while((pos + varNameLen) < len(cmds)):
+                varNameLen += 1
+                #if (!cmds.substring(pos + varNameLen, pos + varNameLen + 1).matches("[a-zA-Z0-9_]")) break;
+                if(re.match('[a-zA-Z0-9_]',cmds[pos + varNameLen,pos + varNameLen+1])):
+                    break
+            varName =  cmds[pos,pos + varNameLen]
+            val = props.get('Properties',varName)
+            pos += (1+varNameLen if encloser else varNameLen)
+            cmds = cmds[0:pos2] + val +cmds[pos:]
+            pos1 = pos2 + len(val)
+            pos=cmds.index('$',pos1)
+        return cmds
+            
+    def Initialize(self,cfgFile):
+        startDateTime = time.strftime('%Y%m%d%H%M%S',time.localtime(time.time()))
+        cfgInit = cfgFile
+        config = ConfigParser.SafeConfigParser()
+        try:
+            config.read(cfgFile)
+        except ConfigParser.Error as e:
+            logging.error("!!! The initial confgiure file can not be opened. !!!")
+            sys.exit(1)
+
+        if(not config.has_section('ETL')):
+            logging.info("!!! The initial confgiure file has not setion \[ETL\]. !!!")
+        else:
+            if(config.has_option('ETL','AUTO_HOME')):
+                self.Auto_home = config.get('ETL','AUTO_HOME')
+            else:
+                self.Auto_home = '/ETL'
+            if(config.has_option('ETL','AUTO_SERVER')):
+                self.Auto_server = config.get('ETL','AUTO_SERVER')
+            else:
+                self.Auto_server = 'ETL1'
+            if(config.has_option('ETL','AUTO_URL')):
+                self.Auto_url = config.get('ETL','AUTO_URL')
+            else:
+                self.Auto_url = 'jdbc:teradata://127.0.0.1/CLIENT_CHARSET=cp936'
+            if(config.has_option('ETL','AUTO_DB')):
+                self.Auto_db = config.get('ETL','AUTO_DB')
+            else:
+                self.Auto_db = 'etl'
+            if(config.has_option('ETL','AUTO_DSN')):
+                self.Auto_dsn = config.get('ETL','AUTO_DSN')
+            else:
+                self.Auto_dsn = ''
+            if(config.has_option('ETL','AUTO_JOB_COUNT')):
+                self.AutoMaxJobCount = config.getint('ETL','AUTO_JOB_COUNT')
+            else:
+                self.AutoMaxJobCount = 10
+            if(config.has_option('ETL','AUTO_SLEEP')):
+                self.AutoSleep = config.getint('ETL','AUTO_SLEEP')
+            else:
+                self.AutoSleep = 30
+            if(config.has_option('ETL','AUTO_CLEAN_HOUR')):
+                self.cleanHour = config.getint('ETL','AUTO_CLEAN_HOUR')
+            else:
+                self.cleanHour = 4
+            if(config.has_option('ETL','UserName')):
+                self.UserName = config.get('ETL','UserName')
+            else:
+                self.UserName = 'etl'
+            if(config.has_option('ETL','UserPass')):
+                self.UserPass = config.get('ETL','UserPass')
+            else:
+                self.UserPass = 'etl'
+
+    def HearBeat(self):
+        pass
+
+    def ShowTime(self):
+        logging.info('['+time.strftime('%H:%M:%S',time.localtime(time.time()))+']')
+
+    def IsJobAlreadyHasEvent(self,job,eventDesc):
+        if(self.jobEvent.has_key(job) and str(self.jobEvent.get(job))==eventDesc):
+            return True
+        self.jobEvent[job] = eventDesc
+        return False
+
+    def RemoveJobEventRecord(self,job):
+        self.jobEvent.pop(job)
+
+    def ShowPrefixSpace(self):
+        logging.info("             ")
+
+    def PrintVersionInfo(self,servAuto):
+        logging.info("*******************************************************************") 
+        logging.info("* ETL Automation " + servAuto + " Program " + "2.7.1_01" + " ,slim 2017 Copyright. *")
+        logging.info("*******************************************************************")
+
+    def Connect(self):
+        if not self.Auto_url:
+            self.Auto_url = self.UserName + '/' +  self.UserPass + '@' + self.Auto_ip + self.Auto_dsn
+        try:
+            logging.info("Auto_dsn is: "+self.Auto_url)
+            con = oracle.connect(self.Auto_url)
+        except oracle.Error as e:
+            logging.error("Connect Error:"+e.message)
+            return None            
+        return con
+
+    def ping(self,con):
+        if not con:
+            return False
+        sqlText = "select 1 from dual"
+        try:
+            cursor = con.cursor()
+            cursor.execute(sqlText)
+            result = cursor.fetchone()
+            if not result[0]:
+                return False
+            return True    
+        except oracle.DatabaseError as e:
+            logging.error("Database Error Code: "+e.code)
+            logging.error("Database Error Message: "+e.message)
+            return False
+    
+    def WriteMessageNotification(self,sys,job,txdate,type,subject,content,logName):
+        pass
+
+    def WriteMessageNotification(self,sys,job,txdate,type,subject,content):
+        pass
+
+    def getAgentPort(self,con,serverName):
+        
+
+
+        
+
         
 
 
@@ -102,6 +247,18 @@ class ETL:
 
 
 if __name__== '__main__':
-    print ETL.Version
+    logging.info(ETL.Version) 
     etl = ETL()
-    print etl.isOKDate('20170344')
+    logging.info(etl.isOKDate('20170344'))
+    #cfgFile = 'D:\GitHub\ETL_automination\etlAuto\etl\etl.cfg'
+    #etl.Initialize(cfgFile)
+    #print etl.AutoMaxJobCount
+    #print etl.AutoSleep
+    #print etl.Auto_db
+    #print etl.Auto_dsn
+    #print etl.Auto_home
+    logging.info(etl.ShowTime())
+    logging.info(etl.PrintVersionInfo('ETL1'))
+    con = etl.Connect()
+    logging.info(etl.ping(con))
+

@@ -6,6 +6,8 @@ import time
 import ConfigParser
 import logging
 import cx_Oracle as oracle
+import itertools
+
 logging.basicConfig(level=logging.INFO)
 
 class ETL:
@@ -26,7 +28,7 @@ class ETL:
     isPrimaryServer = False
     cleanHour = 4
     startDateTime = ""
-    msgCount = 0
+    msgCount = itertools.count(0)
     #Properties cfgVar
     #Connection lockCon
     firstCall = True
@@ -217,14 +219,51 @@ class ETL:
             logging.error("Database Error Message: "+e.message)
             return False
     
-    def WriteMessageNotification(self,sys,job,txdate,type,subject,content,logName):
-        pass
+    def WriteMessageNotification(self,sys,job,txdate,type,subject,content,logName=None):
+        msgId = self.msgCount.next()
+        msgFileName = self.Auto_home + "/DATA/message/" + self.startDateTime + "_" + msgId + ".msg"
+        with open(msgFileName,'a') as msg:
+            msg.write("Automation Message Notification")
+            msg.write("SYSTEM: %s\nJOB: %s\nTXDATE: %s\nTYPE: %s\n") % (sys,job,txdate,type)
+            if not logName:
+                msg.write("ATT:\nSUBJECT: %s\nCONTENT: %s\n") % (subject,content)
+            else:    
+                msg.write("ATT: %s\nSUBJECT: %s\nCONTENT: %s\n") % (logName,subject,content)
+
 
     def WriteMessageNotification(self,sys,job,txdate,type,subject,content):
         pass
 
     def getAgentPort(self,con,serverName):
-        
+        sqlText = "SELECT  AgentPort, isPrimary FROM ETL_Server WHERE ETL_Server = '" + serverName +"'"
+        try:
+            cursor = con.cursor()
+            cursor.execute(sqlText)
+            result = cursor.fetchone()
+            if not result[0]:
+                serverPort = 0
+            serverPort = result[0]
+            yn = result[1]
+            if(yn == 'Y'):
+                self.isPrimaryServer = True   
+        except oracle.DatabaseError as e:
+            logging.error("Database Error Code: "+e.code)
+            logging.error("Database Error Message: "+e.message)
+            serverPort = 0
+        finally:    
+            return serverPort
+    
+    def getLogContentText(self,con,logName):
+        textContent = ""
+        with open(logName,'r') as log:
+            while(True):
+                line = log.readline()
+                if not line:
+                    break
+                textContent = textContent + "\n" + line
+        return textContent            
+
+
 
 
         

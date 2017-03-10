@@ -14,7 +14,7 @@ class ETL:
     Version = "2.7.1_01"
     Auto_home = "/ETL"
     Auto_server = "ETL1"
-    Auto_url = "fsicbc02/FSICBC02@172.17.0.120/orcl"
+    Auto_url = "etl/etl@172.17.0.120/orcl"
     Auto_dsn = ""
     UserName = "etl"
     UserPass = "etl"
@@ -29,6 +29,7 @@ class ETL:
     cleanHour = 4
     startDateTime = ""
     msgCount = itertools.count(0)
+    cfgFile = "/home/FSICBC/liuhr/ETLAuto/etl.cfg"
     #Properties cfgVar
     #Connection lockCon
     firstCall = True
@@ -64,10 +65,9 @@ class ETL:
         try:
             cursor = con.cursor()
             cursor.executemany(sqlText,rows)
-            con.commit
+            con.commit()
         except oracle.DatabaseError as error:
-            logging.error("Oracle-Error-Code: "+error.code)
-            logging.error("Oracle-Error-Message: "+error.message) 
+            logging.error("Oracle-Error-Message: "+str(error.message)) 
             cursor.close()
             con.close()
             return False
@@ -115,12 +115,12 @@ class ETL:
             pos=cmds.index('$',pos1)
         return cmds
             
-    def Initialize(self,cfgFile):
+    def Initialize(self,cfg=cfgFile):
         startDateTime = time.strftime('%Y%m%d%H%M%S',time.localtime(time.time()))
-        cfgInit = cfgFile
+        cfgInit = cfg
         config = ConfigParser.SafeConfigParser()
         try:
-            config.read(cfgFile)
+            config.read(cfg)
         except ConfigParser.Error as e:
             logging.error("!!! The initial confgiure file can not be opened. !!!")
             sys.exit(1)
@@ -176,7 +176,7 @@ class ETL:
         logging.info('['+time.strftime('%H:%M:%S',time.localtime(time.time()))+']')
 
     def IsJobAlreadyHasEvent(self,job,eventDesc):
-        if(self.jobEvent.has_key(job) and str(self.jobEvent.get(job))==eventDesc):
+        if(self.jobEvent.has_key(job) and str(self.jobEvent.get(job))== eventDesc):
             return True
         self.jobEvent[job] = eventDesc
         return False
@@ -199,7 +199,7 @@ class ETL:
             logging.info("Auto_dsn is: "+self.Auto_url)
             con = oracle.connect(self.Auto_url)
         except oracle.Error as e:
-            logging.error("Connect Error:"+e.message)
+            logging.error("Connect Error:"+str(e.message))
             return None            
         return con
 
@@ -215,8 +215,7 @@ class ETL:
                 return False
             return True    
         except oracle.DatabaseError as e:
-            logging.error("Database Error Code: "+e.code)
-            logging.error("Database Error Message: "+e.message)
+            logging.error("Database Error Message: "+str(e.message))
             return False
     
     def WriteMessageNotification(self,sys,job,txdate,type,subject,content,logName=None):
@@ -247,8 +246,7 @@ class ETL:
             if(yn == 'Y'):
                 self.isPrimaryServer = True   
         except oracle.DatabaseError as e:
-            logging.error("Database Error Code: "+e.code)
-            logging.error("Database Error Message: "+e.message)
+            logging.error("Database Error Message: "+str(e.message))
             serverPort = 0
         finally:    
             return serverPort
@@ -263,32 +261,12 @@ class ETL:
                 textContent = textContent + "\n" + line
         return textContent            
 
-
-
-
-        
-
-        
-
-
-            
-
-        
-
-
-
-
-
-        
-
-
-
-
-
 if __name__== '__main__':
     logging.info(ETL.Version) 
     etl = ETL()
-    logging.info(etl.isOKDate('20170344'))
+    etl.Initialize()
+    logging.info(etl.Auto_server)
+    #logging.info(etl.isOKDate('20170344'))
     #cfgFile = 'D:\GitHub\ETL_automination\etlAuto\etl\etl.cfg'
     #etl.Initialize(cfgFile)
     #print etl.AutoMaxJobCount
@@ -296,8 +274,8 @@ if __name__== '__main__':
     #print etl.Auto_db
     #print etl.Auto_dsn
     #print etl.Auto_home
-    logging.info(etl.ShowTime())
-    logging.info(etl.PrintVersionInfo('ETL1'))
-    con = etl.Connect()
-    logging.info(etl.ping(con))
+    #logging.info(etl.ShowTime())
+    #logging.info(etl.PrintVersionInfo('ETL1'))
+    #con = etl.Connect()
+    #logging.info(etl.ping(con))
 

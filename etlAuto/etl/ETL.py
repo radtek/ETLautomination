@@ -168,6 +168,7 @@ class ETL:
                 self.UserPass = config.get('ETL','UserPass')
             else:
                 self.UserPass = 'etl'
+           
 
     def HearBeat(self):
         pass
@@ -262,10 +263,11 @@ class ETL:
         return textContent            
 
 if __name__== '__main__':
-    logging.info(ETL.Version) 
-    etl = ETL()
-    etl.Initialize()
-    logging.info(etl.Auto_server)
+    logging.info(ETL.Version)
+    #print ETL.isOKDate('20170309') 
+    #etl = ETL()
+    #etl.Initialize()
+    #logging.info(etl.Auto_server)
     #logging.info(etl.isOKDate('20170344'))
     #cfgFile = 'D:\GitHub\ETL_automination\etlAuto\etl\etl.cfg'
     #etl.Initialize(cfgFile)

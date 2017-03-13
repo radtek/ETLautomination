@@ -35,6 +35,15 @@ class ETL:
     firstCall = True
     serviceHold = 0
 
+    def getConfig(self,cfg=cfgFile):
+        config = ConfigParser.SafeConfigParser()
+        try:
+            config.read(cfg)
+        except ConfigParser.Error as e:
+            logging.error("!!! The initial confgiure file can not be opened. !!!")
+            sys.exit(1)
+        return config      
+
     def isOKDate(self,txDate):
         if(len(txDate) < 8):
             return False
@@ -117,13 +126,8 @@ class ETL:
             
     def Initialize(self,cfg=cfgFile):
         startDateTime = time.strftime('%Y%m%d%H%M%S',time.localtime(time.time()))
-        cfgInit = cfg
-        config = ConfigParser.SafeConfigParser()
-        try:
-            config.read(cfg)
-        except ConfigParser.Error as e:
-            logging.error("!!! The initial confgiure file can not be opened. !!!")
-            sys.exit(1)
+        #cfgInit = cfg
+        config = self.getConfig(cfg)
 
         if(not config.has_section('ETL')):
             logging.info("!!! The initial confgiure file has not setion \[ETL\]. !!!")
@@ -264,6 +268,9 @@ class ETL:
 
 if __name__== '__main__':
     logging.info(ETL.Version)
+    etl = ETL()
+    etl.Initialize()
+    print etl.Auto_home
     #print ETL.isOKDate('20170309') 
     #etl = ETL()
     #etl.Initialize()

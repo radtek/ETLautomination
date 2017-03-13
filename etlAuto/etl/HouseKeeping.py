@@ -8,7 +8,7 @@ import shutil
 from ETL import ETL
 from ETLSys import ETLSys
 
-logging.baseConfig(level = logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 class HouseKeeping:
     dberr = False
@@ -16,6 +16,7 @@ class HouseKeeping:
     lastHour = 15
     etl = ETL()
     etl.Initialize()
+    config = etl.getConfig()
 
     def removeSubDirectory(self,dirF):
         if os.path.exists(dirF) and os.path.isdir(dirF):
@@ -24,9 +25,11 @@ class HouseKeeping:
             return
 
     def doCleanup(self,con):
-    ## 暂时没想明白配置文件的属性如何获取
-        keepDays = 30
-        expiredDate = (datetime.date.today()-datetime.timedelta(days=self.keepDays)).strftime('%Y%m%d')
+        if(self.config.has_option('ETL','AUTO_KEEP_PERIOD')):
+            keepDays = self.config.get('ETL','AUTO_KEEP_PERIOD')
+        else:
+            keepDays = 30
+        expiredDate = (datetime.date.today()-datetime.timedelta(days=keepDays)).strftime('%Y%m%d')
         clearupPath(etl.Auto_home+"/DATA/fail/unknown",expiredDate)
         logDir = etl.Auto_home + "/LOG"
         if os.path.isdir(logDir):
@@ -37,11 +40,13 @@ class HouseKeeping:
     def CleanupAll(self,con):
         pass
 
-    def clearupPath(self,basePath,expiredDate);
+    def clearupPath(self,basePath,expiredDate):
         pass
 
 if __name__ == '__main__':
-    pass                                
+     con = None
+     hok = HouseKeeping()
+     print hok.doCleanup(con)                               
 
 
 

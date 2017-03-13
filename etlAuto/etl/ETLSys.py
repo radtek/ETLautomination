@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import sys
 import logging
@@ -5,6 +6,7 @@ import time
 import datetime
 import cx_Oracle as oracle
 from ETL import ETL
+from HouseKeeping import HouseKeeping
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,8 +17,9 @@ class ETLSys:
     RecordKeepPeriod = 30
     etl = ETL()
     etl.Initialize()
+    houKeep = HouseKeeping()
 
-    def dbGetSys(sys,con,houseKeeping):
+    def dbGetSys(sys,con):
         sysList = []
         sqlText = "select ETL_System, DataKeepPeriod , LogKeepPeriod, RecordKeepPeriod from ETL_Sys"
         try:
@@ -32,25 +35,25 @@ class ETLSys:
                 sysList.append(e)
         except oracle.DatabaseError as e:
             logging.error("Database Error Message: "+str(e.message))
-            houseKeeping.dberr = True    
+            self.houKeep.dberr = True    
         return sysList
 
-    def  cleaup(self,con,houseKeeping):
+    def  cleaup(self,con):
         expiredDate = (datetime.date.today()-datetime.timedelta(days=self.DataKeepPeriod)).strftime('%Y%m%d')
-        houseKeeping.clearupPath(etl.Auto_home + "/DATA/complete/" + self.sys,expiredDate)
-        houseKeeping.clearupPath(etl.Auto_home + "/DATA/fail/corrupt/" + self.sys,expiredDate)   
-        houseKeeping.clearupPath(etl.Auto_home + "/DATA/fail/bypass/" + self.sys,expiredDate)
-        houseKeeping.clearupPath(etl.Auto_home + "/DATA/fail/duplicate/" + self.sys,expiredDate)
-        houseKeeping.clearupPath(etl.Auto_home + "/DATA/fail/error/" + self.sys,expiredDate)
+        self.houKeep.clearupPath(etl.Auto_home + "/DATA/complete/" + self.sys,expiredDate)
+        self.houKeep.clearupPath(etl.Auto_home + "/DATA/fail/corrupt/" + self.sys,expiredDate)   
+        self.houKeep.clearupPath(etl.Auto_home + "/DATA/fail/bypass/" + self.sys,expiredDate)
+        self.houKeep.clearupPath(etl.Auto_home + "/DATA/fail/duplicate/" + self.sys,expiredDate)
+        self.houKeep.clearupPath(etl.Auto_home + "/DATA/fail/error/" + self.sys,expiredDate)
 
         expiredDate = (datetime.date.today()-datetime.timedelta(days=self.LogKeepPeriod)).strftime('%Y%m%d')
-        houseKeeping.clearupPath(etl.Auto_home + "/LOG/" + self.sys, expiredDate)
+        self.houKeep.clearupPath(etl.Auto_home + "/LOG/" + self.sys, expiredDate)
 
         expiredDate = (datetime.date.today()-datetime.timedelta(days=self.RecordKeepPeriod)).strftime('%Y%m%d')
-        houseKeeping.clearupPath(etl.Auto_home + "/LOG/" + self.sys, expiredDate)
+        self.houKeep.clearupPath(etl.Auto_home + "/LOG/" + self.sys, expiredDate)
 
         if etl.isPrimaryServer:
-            houseKeeping.log.write("Clean repository log for system '" + self.sys + "'")
+            self.houKeep.log.write("Clean repository log for system '" + self.sys + "'")
             sqlText = "DELETE FROM ETL_Received_File WHERE ETL_System = '" + self.sys + "' AND ReceivedTime <= '" + expiredDate + "'"
             try:
                 cursor = con.cursor()

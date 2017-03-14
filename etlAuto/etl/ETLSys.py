@@ -55,8 +55,8 @@ class ETLSys:
         if etl.isPrimaryServer:
             self.houKeep.log.write("Clean repository log for system '" + self.sys + "'")
             sqlText = "DELETE FROM ETL_Received_File WHERE ETL_System = '" + self.sys + "' AND ReceivedTime <= '" + expiredDate + "'"
+            cursor = con.cursor()
             try:
-                cursor = con.cursor()
                 cursor.execute(sqlText)
                 con.commit()
             except oracle.DatabaseError as e:
@@ -65,8 +65,8 @@ class ETLSys:
                 con.close()
 
             sqlText = "DELETE FROM ETL_Record_Log WHERE ETL_System = '" + self.sys + "' AND RecordTime <= '" + expiredDate + "'"
+            cursor = con.cursor()
             try:
-                cursor = con.cursor()
                 cursor.execute(sqlText)
                 con.commit()
             except oracle.DatabaseError as e:
@@ -75,8 +75,8 @@ class ETLSys:
                 con.close()
 
             sqlText = "DELETE FROM ETL_Job_Log WHERE ETL_System = '" + self.sys + "' AND StartTime <= '" + expiredDate + "'"
+            cursor = con.cursor()
             try:
-                cursor = con.cursor()
                 cursor.execute(sqlText)
                 con.commit()
             except oracle.DatabaseError as e:

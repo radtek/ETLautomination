@@ -11,7 +11,7 @@ import itertools
 
 logging.basicConfig(level=logging.INFO)
 
-class ETL:
+class ETL(object):
     Version = "2.7.1_01"
     Auto_home = "/ETL"
     Auto_server = "ETL1"

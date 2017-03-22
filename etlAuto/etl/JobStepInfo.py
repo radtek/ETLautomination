@@ -129,10 +129,163 @@ class JobStepInfo(object):
             desc = "Job [" + self.sys + "," + self.job + "] has error record"
             etl.WriteMessageNotification(self.sys, self.job, self.txDate, "RecordError", desc, content)
 
-            
+        sqlText = "DELETE FROM ETL_Record_Log WHERE ETL_System ='" + self.sys + "' AND ETL_Job = '" + self.job + \
+        "' AND JobSessionID = " + self.sessionId 
+        sqlText2 =  " INSERT INTO ETL_Record_Log (ETL_System, ETL_Job, JobSessionID, RecordTime, " + \
+        " InsertedRecord, UpdatedRecord, DeletedRecord,DuplicateRecord, OutputRecord, ETRecord, UVRecord," + \
+        " ER1Record, ER2Record)" + \
+        " VALUES ('" + self.sys + "', '" + self.job + "', " + self.sessionId + ", '" + etl.GetDateTime() + "', " + \
+        num_ins + ", " + num_upd + ", " + num_del + ", " + num_dup + ", " + num_out + ", " + \
+        num_et + ", " + num_uv + ", " + num_er1 + ", " + num_er2 + ")"
+        try:
+            cursor = con.cursor()
+            cursor.execute(sqlText)
+            cursor.execute(sqlText2)
+            con.commit()
+        except oracle.DatabaseError as error:
+            logging.error("Oracle-Error-Message: "+str(error.message)) 
+            cursor.close()
+            con.close()
+        finally:
+            cursor.close()
+            con.close()
+    
+    def updateStepRunning(self,con,s):
+        setStartT = None
+        sqlText1 = None
+        if s == 0:
+            setStartT = " ,Last_StartTime='" + etl.GetDateTime() + "', Last_EndTime=null, " + \
+            "Last_JobStatus='Running', Last_TXDate = CAST('" + self.txDate + "' AS DATE FORMAT 'YYYYMMDD')"
+            sqlText1 = "UPDATE ETL_Job_GroupChild SET CheckFlag = 'N' WHERE ETL_System = '" + self.sys + "' AND ETL_Job = '" + self.job
+        sqlText2 = "Update ETL_job SET RunningScript='" + self.ScriptName + "'" + setStartT + " WHERE ETL_System='" + self.sys + \
+        "' AND ETL_Job='" + self.job
+        self.sTime = etl.GetDateTime()
+        sqlText3 = "Insert INTO ETL_Job_Log(ETL_System, ETL_Job, JobSessionID, ScriptFile, TxDate, StartTime, Step_No) "+\
+        " select ETL_System, ETL_Job, JobSessionID, RunningScript, Last_TXDate, '" + self.sTime + "', " + self.Step_No + \
+        " FROM ETL_Job WHERE ETL_System='" + self.sys + "' AND ETL_Job='" + self.job + "'"
+        try:
+            cursor = con.cursor()
+            if sqlText:
+                cursor.execute(sqlText)
+            cursor.execute(sqlText2)
+            cursor.execute(sqlText3)
+            con.commit()
+        except oracle.DatabaseError as error:
+            logging.error("Oracle-Error-Message: "+str(error.message)) 
+            cursor.close()
+            con.close()
+        finally:
+            cursor.close()
+            con.close()
+
+    def updateStepFinal(self,con,retCode,eTime,logContent):
+        sqlText = "Update ETL_Job_Log SET EndTime='" + eTime + "', ReturnCode=" + retCode + \
+        ", LogContent = :blobData WHERE ETL_System='" + self.sys + \
+        "' AND ETL_Job='" + self.job + "' AND JobSessionID=" + self.sessionId + " AND StartTime='" + self.sTime + \
+        "' AND Step_No=" + self.Step_No
+        ## blob 类型的写入操作
+        try:
+            cursor = con.cursor()
+            cursor.setinputsizes(blobData=cx_Oracle.BLOB)
+            cursor.execute(sqlText, {'blobData':logContent})
+            con.commit()
+        except oracle.DatabaseError as error:
+            logging.error("Oracle-Error-Message: "+str(error.message)) 
+            cursor.close()
+            con.close()
+        finally:
+            cursor.close()
+            con.close()
+
+    def getStep(self,con,sys,job,prop):
+        stepList = []
+        sqlText = "select JobType, JobSessionID FROM ETL_Job WHERE ETL_System = '" + sys + "' AND ETL_Job = '" + job + "'"
+        try:
+            cursor = con.cursor()
+            cursor.execute(sqlText)
+            result = cursor.fetchone() 
+        except oracle.DatabaseError as e:
+            logging.error("Oracle-Error-Message: "+str(error.message)) 
+            cursor.close()
+            con.close()
+        finally:
+            cursor.close()
+            con.close()
+
+        jobType = ""
+        sessionId = 0
+        txDate = etl.getConfig(prop).get("ETL","TXDATE")  
+        if result:
+            jobType = result[0]
+            sessionId = result[1]
+        if jobType == "V":
+            s = JobStepInfo()
+            s.sys = sys
+            s.job = job
+            s.txDate = txDate    
+            s.sessionId = sessionId
+            s.OSProgram = "VirtualPGM"
+            s.ScriptName = "Virtual-Script"
+            s.exeCommand = "V"
+            s.Step_type = "V"
+            stepList.extend(s)
+            return stepList
+
+        sqlText = "SELECT Step_No, Step_type, OSProgram, WorkDir, ScriptName, ScriptPath, AdditionParameters FROM ETL_Job_Step " + \
+        "WHERE Enable = '1' AND ETL_System = '" + sys + "' AND ETL_Job = '" + job + "' ORDER BY Step_NO"
+        try:
+            cursor = con.cursor()
+            cursor.execute(sqlText)
+            result = cursor.fetchall() 
+        except oracle.DatabaseError as e:
+            logging.error("Oracle-Error-Message: "+str(error.message)) 
+            cursor.close()
+            con.close()
+        finally:
+            cursor.close()
+            con.close()
+
+        if result:
+            for listInfo in result:
+                s = JobStepInfo()
+                s.sys = sys
+                s.job = job
+                s.txDate = txDate
+                s.sessionId = sessionId
+                s.Step_No = listInfo[0]
+                s.Step_type = listInfo[1]
+                s.OSProgram = listInfo[2]
+                if listInfo[3]:
+                    s.WorkDir = listInfo[3]
+                else:
+                    s.WorkDir = ""
+                if len(s.WorkDir) == 0:
+                    s.WorkDir = "$AUTO_HOME/DATA/process"
+                if listInfo[4]:
+                    s.ScriptName = listInfo[4]
+                else:
+                    s.ScriptName = ""
+                if listInfo[5]:
+                    s.ScriptPath = listInfo[5]
+                else:
+                    s.ScriptPath = ""
+                if len(s.ScriptPath):
+                    s.ScriptPath = "$AUTO_HOME/APP/" + sys + "/" + job + "/bin"
+                if listInfo[6]:
+                    s.AdditionParameters = listInfo[6]
+                else:
+                    s.AdditionParameters = ""
+                s.exeCommand = s.StepCommand(prop)
+                s.WorkDir = etl.putVarsToCommand(prop, s.WorkDir)
+                stepList.extend(s)
+        return stepList
+
+if __name__ == '__main__':
+    pass                       
 
 
-                            
+
+
                
 
 

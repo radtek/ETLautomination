@@ -11,6 +11,9 @@ import itertools
 
 logging.basicConfig(level=logging.INFO)
 
+
+## static变量写在类成员变量里面
+## 实例变量则写在 __init_ 方法
 class ETL(object):
     Version = "2.7.1_01"
     Auto_home = "/ETL"

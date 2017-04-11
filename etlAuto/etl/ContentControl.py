@@ -19,8 +19,6 @@ class ContentControl:
     expect = None
     totalExpectedRecord = None
 
-    etl = ETL()
-
     def __init__(self,**kwargs):            
         if kwargs.has_key('dir') and kwargs.has_key('name'):
             logging.info("dir is "+kwargs['dir']+" and name is: "+kwargs['name'] )
@@ -79,7 +77,7 @@ class ContentControl:
         return True    
 
     def MoveToday(self,toDir):
-        MoveTo(toDir+'/'+etl.today)
+        MoveTo(toDir+'/'+ETL.today)
 
     def updateFileLocation(self,con,loc,sys,job,sess=None):
         for i in range(self.dataCount):

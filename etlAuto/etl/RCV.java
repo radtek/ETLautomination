@@ -103,7 +103,10 @@
 /*  95 */     boolean ret = true;
 /*  96 */     ETL.ShowPrefixSpace(out); out.println("Check related job status...");
 /*  97 */     String relCheck = 
-/*  98 */       "SELECT  B.ETL_System, B.ETL_Job, A.CheckMode, Last_JobStatus, Last_TXDate, JobType, CheckCalendar,  cast('%3$s' as date format 'YYYYMMDD') - Last_TXDate  dayDiff          \nFROM ETL_RelatedJob A, ETL_JOB B                                       \nWHERE A.etl_system = '%1$s' AND A.etl_job='%2$s'                       \n  AND A.RelatedSystem = B.ETL_System  AND A.RelatedJob = B.ETL_Job     \n";
+/*  98 */       "SELECT  B.ETL_System, B.ETL_Job, A.CheckMode, Last_JobStatus, Last_TXDate, JobType, CheckCalendar,  cast('%3$s' as date format 'YYYYMMDD') - Last_TXDate  dayDiff          \n
+FROM ETL_RelatedJob A, ETL_JOB B                                       \n
+WHERE A.etl_system = '%1$s' AND A.etl_job='%2$s'                       \n  
+AND A.RelatedSystem = B.ETL_System  AND A.RelatedJob = B.ETL_Job     \n";
 /*     */ 
 /* 103 */     String sql = String.format(relCheck, new Object[] { job.sysName, job.jobName, txDate });
 /*     */     try {

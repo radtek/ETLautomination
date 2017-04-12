@@ -96,7 +96,7 @@ class ETL(object):
         year = int(txDate[0:4])
         month = int(txDate[4:6])
         date = int(txDate[6:8])
-        return datetime.datetime(year,month-1,date)
+        return datetime.datetime(year,month,date)
 
     def GetToday(self):
         return time.strftime('%Y%m%d',time.localtime(time.time()))

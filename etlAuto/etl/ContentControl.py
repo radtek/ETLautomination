@@ -101,7 +101,7 @@ class ContentControl:
                 cursor.close()
                 con.close()
           
-    def CheckDataFileDuplicate(self,con,sysName,jobName,log):
+    def CheckDataFileDuplicate(self,con,sysName,jobName):
         ret = True
         if(self.dataCount == 0):
             return ret

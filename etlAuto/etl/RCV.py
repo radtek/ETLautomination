@@ -4,6 +4,7 @@ import sys
 import re
 import datetime
 import time
+import shutil
 import logging
 from glob import glob
 import cx_Oracle as oracle
@@ -313,7 +314,53 @@ class RCV(object):
             	self.dberr = True	
 
     def ConvertControlFile(self,job,cont,txDate):
-    	pass
+    	rcvTime = time.strftime('%Y%m%d %H%M%S',time.localtime(time.time()))
+    	baseDir = os.path.dirname(cont.nameControl)
+    	insertCmd = "insert into ETL_Received_File (ETL_System, ETL_Job, JobSessionID, ReceivedFile, FileSize, ExpectedRecord, ArrivalTime, ReceivedTime, Location, Status) \
+    				values ('%s', '%s', %s, '%s', %d, %d, '%s', '%s', '%s', '1')"
+    	ctlFileName = ETL.Auto_home + "/tmp/%s_%s_%s.dir"%(job.sysName,job.convHead,txDate)
+    	with open(ctlFileName,'w') as CTLF:
+    		for i in range(0,len(cont.dataCount)):
+    			file = baseDir + "/" + cont.dataFile[i]
+    			ariTime = datetime.datetime.fromtimestamp(os.path.getatime(file)).strftime('%Y%m%d %H%M%S')
+    			sqlText = insertCmd %(job.sysName, job.jobName, job.jobSessionID, cont.dataFile[i],cont.fileSize[i],cont.expect[i],ariTime,rcvTime,ETL.Auto_home + "/DATA/queue")
+    			try:
+    				cursor = self.conn.cursor()
+            		cursor.execute(sqlText)
+            		self.conn.commit()
+    			except oracle.DatabaseError as e:
+    				logging.error("Database Error Message: "+str(e.message))
+    				self.dberr = True
+    				logging.info(ETL.ShowPrefixSpace())
+    				logging.info("Error - insert source files into ETL_Received_file failed!")
+    			CTLF.write(("%s\t%d")%(cont.dataFile[i],cont.fileSize[i]))
+    	
+    	for i in range(0,len(cont.dataCount)):
+    		dataF = baseDir + "/" + cont.dataFile[i]
+    		dataQ = ETL.Auto_home + "/DATA/queue/" + cont.dataFile[i]
+    		shutil.move(dataF,dataQ)
+
+    	shutil.move(ctlFileName,ETL.Auto_home+("/DATA/queue/%s_%s_%s.dir")%(job.sysName,job.convHead,txDate))
+    	logging.info(ETL.ShowPrefixSpace())
+    	completeDir = ETL.Auto_home + "/DATA/complete/" + job.sysName + "/" + ETL.today
+    	if not os.path.exists(completeDir):
+    		os.makedirs(completeDir)
+    	compF = os.path.dirname(completeDir)+"/"+os.path.basename(cont.nameControl)
+    	shutil.move(cont.nameControl,compF)
+
+    	logging.info(("Update job status to 'Pending' for %s, %s, %s")%(job.sysName,job.jobName,txDate))
+    	sqlText = "update ETL_Job set Last_StartTime = '%s', Last_EndTime = null, Last_JobStatus = 'Pending',\
+    			  Last_TXDate = %s-19000000, Last_FileCnt= %d, Last_CubeStatus = null, ExpectedRecord =%d \
+    			  WHERE ETL_System = '%s' AND ETL_Job = '%s'" %(rcvTime,txDate,cont.dataCount,cont.totalExpectedRecord,job.sysName,job.jobName)	
+    	try:
+    		cursor = self.conn.cursor()
+            cursor.execute(sqlText)
+            self.conn.commit()
+    	except oracle.DatabaseError as e:
+    		logging.error("Database Error Message: "+str(e.message))
+    		self.dberr = True
+    		logging.info(ETL.ShowPrefixSpace())
+    		logging.info("Error--Update job status failed!")		     					
 
     def CheckDataCalendar(self,job,txDate):
     	sqlText = "select  CalendarYear*10000 + CalendarMonth*100 + CalendarDay dt, CheckFlag \
